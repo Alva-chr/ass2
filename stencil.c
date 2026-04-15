@@ -109,6 +109,7 @@ int main(int argc, char **argv) {
 	}
 
 	
+	double *process_output = malloc(elements_per_process * sizeof(double)); //output for each process
 
 
 	// Repeatedly apply stencil
@@ -122,42 +123,25 @@ int main(int argc, char **argv) {
 
 
 		// Apply stencil
-		for (int i=0; i<EXTENT; i++) {
-			double result = 0;
-			for (int j=0; j<STENCIL_WIDTH; j++) {
-				int index = (i - EXTENT + j + num_values) % num_values;
-				result += STENCIL[j] * input[index];
-			}
-			output[i] = result;
-		}
 
-		for (int i=EXTENT; i<num_values-EXTENT; i++) {
+		for (int i=EXTENT; i<elements_per_process+EXTENT; i++) {
 			double result = 0;
 			for (int j=0; j<STENCIL_WIDTH; j++) {
-				int index = i - EXTENT + j;
-				result += STENCIL[j] * input[index];
+				int index = i + j;
+				result += STENCIL[j] * process_memory[index];
 			}
-			output[i] = result;
+			process_output[i] = result;
 		}
 		
-		for (int i=num_values-EXTENT; i<num_values; i++) {
-			double result = 0;
-			for (int j=0; j<STENCIL_WIDTH; j++) {
-				int index = (i - EXTENT + j) % num_values;
-				result += STENCIL[j] * input[index];
-			}
-			output[i] = result;
-		}
 		// Swap input and output
-		if(rank == root){
-
-		}
 		if (s < num_steps-1) {
-			double *tmp = input;
-			input = output;
-			output = tmp;
+			double *tmp = data;
+			data = process_output;
+			process_output = tmp;
 		}
 	}
+
+	MPI_Gather(process_output, elements_per_process, MPI_DOUBLE, output, elements_per_process, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
 	free(input);
 	MPI_Request_free(&recv_obj[0]);
