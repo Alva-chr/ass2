@@ -1,4 +1,6 @@
 #include "stencil.h"
+#include <string.h>
+#include <stdio.h>
 
 
 int main(int argc, char **argv) {
@@ -102,11 +104,11 @@ int main(int argc, char **argv) {
 	// MPI_Waitall(2, recv_obj, &status);
 	// MPI_Waitall(2, send_obj, &status);
 
-	if (rank==0){
-		for(int i=0;i<elements_per_process+EXTENT*2;i++) {
-			printf("Rank %d index %d = %lf\n",rank,i,process_memory[i]);
-		}
-	}
+	// if (rank==0){
+	// 	for(int i=0;i<elements_per_process+EXTENT*2;i++) {
+	// 		printf("Rank %d index %d = %lf\n",rank,i,process_memory[i]);
+	// 	}
+	// }
 
 	
 	double *process_output = malloc(elements_per_process * sizeof(double)); //output for each process
@@ -118,13 +120,13 @@ int main(int argc, char **argv) {
 		MPI_Startall(2,recv_obj);
 		MPI_Startall(2,send_obj);
 
-		MPI_Waitall(2, recv_obj, &status);
-		MPI_Waitall(2, send_obj, &status);
+		MPI_Waitall(2, recv_obj, MPI_STATUSES_IGNORE);
+		MPI_Waitall(2, send_obj, MPI_STATUSES_IGNORE);
 
 
 		// Apply stencil
 
-		for (int i=EXTENT; i<elements_per_process+EXTENT; i++) {
+		for (int i=0; i<elements_per_process; i++) {
 			double result = 0;
 			for (int j=0; j<STENCIL_WIDTH; j++) {
 				int index = i + j;
@@ -135,9 +137,7 @@ int main(int argc, char **argv) {
 		
 		// Swap input and output
 		if (s < num_steps-1) {
-			double *tmp = data;
-			data = process_output;
-			process_output = tmp;
+			memcpy(data, process_output, elements_per_process * sizeof(double));
 		}
 	}
 
@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
 	double my_execution_time = MPI_Wtime() - start;
 
 	// Write result
-	//printf("%f\n", my_execution_time);
+	printf("%f\n", my_execution_time);
 	if(rank == root){
 		#ifdef PRODUCE_OUTPUT_FILE
 		if (0 != write_output(output_name, output, num_values)) {
@@ -163,6 +163,7 @@ int main(int argc, char **argv) {
 
 
 	// Clean up
+	free(process_output);
 	free(output);
 	free(process_memory);
 
