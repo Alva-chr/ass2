@@ -2,10 +2,12 @@
 
 
 int main(int argc, char **argv) {
+
 	if (4 != argc) {
 		printf("Usage: stencil input_file output_file number_of_applications\n");
 		return 1;
 	}
+
 	char *input_name = argv[1];
 	char *output_name = argv[2];
 	int num_steps = atoi(argv[3]); //number of times to
@@ -29,9 +31,6 @@ int main(int argc, char **argv) {
 
 	MPI_Bcast(&num_values, 1, MPI_INT, root, MPI_COMM_WORLD);
 
-	//long long first = rank*num_values/size;
-	
-	// long long last = num_values-1;
 
 	// Stencil values
 	double h = 2.0*PI/num_values;
@@ -55,6 +54,7 @@ int main(int argc, char **argv) {
 	int elements_per_process = num_values/size;
 	double *process_memory;
 	double *left_buffer;
+	double *data;
 	double *right_buffer;
 
 	if (NULL == (process_memory = malloc((EXTENT + elements_per_process + EXTENT)* sizeof(double)))) {
@@ -63,65 +63,107 @@ int main(int argc, char **argv) {
 	}
 
 	left_buffer = process_memory;
+	data = process_memory+EXTENT;
 	right_buffer = process_memory+elements_per_process+EXTENT;
 
 
 	
-	MPI_Scatter(input, elements_per_process, MPI_DOUBLE, process_memory+EXTENT, elements_per_process, MPI_DOUBLE, root, MPI_COMM_WORLD);
+	MPI_Scatter(input, elements_per_process, MPI_DOUBLE, data, elements_per_process, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
-	if (rank==1){
+	
+
+	//Setting up persistant communication
+	MPI_Request recv_obj[2];
+	MPI_Request send_obj[2];
+	int src; //source and destination are the same
+
+	if(rank-1 < 0){
+		src = size-1;
+	} else {
+		src = rank -1;
+	}
+
+	MPI_Recv_init(left_buffer,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &recv_obj[0]);
+	MPI_Send_init(left_buffer+EXTENT,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &send_obj[0]);
+
+	if(rank+1>size-1){
+		src = 0;
+	} else{
+		src = rank+1;
+	}
+
+	MPI_Recv_init(right_buffer,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &recv_obj[1]);
+	MPI_Send_init(right_buffer-EXTENT,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &send_obj[1]);
+
+
+	// MPI_Startall(2,recv_obj);
+	// MPI_Startall(2,send_obj);
+
+	// MPI_Waitall(2, recv_obj, &status);
+	// MPI_Waitall(2, send_obj, &status);
+
+	if (rank==0){
 		for(int i=0;i<elements_per_process+EXTENT*2;i++) {
 			printf("Rank %d index %d = %lf\n",rank,i,process_memory[i]);
 		}
 	}
 
-	// // Repeatedly apply stencil
-	// for (int s=0; s<num_steps; s++) {
+	
 
-	// 	if(s== 0){
-	// 		process_memory[0] = input[first -2];
-	// 		process_memory[1] = input[first -1];
-	// 	} else {
-	// 		send to my_rank+1
-	// 		send to my_rank-1
-	// 	}
-	// 	// Apply stencil
-	// 	for (int i=0; i<EXTENT; i++) {
-	// 		double result = 0;
-	// 		for (int j=0; j<STENCIL_WIDTH; j++) {
-	// 			int index = (i - EXTENT + j + num_values) % num_values;
-	// 			result += STENCIL[j] * input[index];
-	// 		}
-	// 		output[i] = result;
-	// 	}
-	// 	for (int i=EXTENT; i<num_values-EXTENT; i++) {
-	// 		double result = 0;
-	// 		for (int j=0; j<STENCIL_WIDTH; j++) {
-	// 			int index = i - EXTENT + j;
-	// 			result += STENCIL[j] * input[index];
-	// 		}
-	// 		output[i] = result;
-	// 	}
-	// 	for (int i=num_values-EXTENT; i<num_values; i++) {
-	// 		double result = 0;
-	// 		for (int j=0; j<STENCIL_WIDTH; j++) {
-	// 			int index = (i - EXTENT + j) % num_values;
-	// 			result += STENCIL[j] * input[index];
-	// 		}
-	// 		output[i] = result;
-	// 	}
-	// 	// Swap input and output
-	// 	if(rank == root){
 
-	// 	}
-	// 	if (s < num_steps-1) {
-	// 		double *tmp = input;
-	// 		input = output;
-	// 		output = tmp;
-	// 	}
-	// }
+	// Repeatedly apply stencil
+	for (int s=0; s<num_steps; s++) {
+
+		MPI_Startall(2,recv_obj);
+		MPI_Startall(2,send_obj);
+
+		MPI_Waitall(2, recv_obj, &status);
+		MPI_Waitall(2, send_obj, &status);
+
+
+		// Apply stencil
+		for (int i=0; i<EXTENT; i++) {
+			double result = 0;
+			for (int j=0; j<STENCIL_WIDTH; j++) {
+				int index = (i - EXTENT + j + num_values) % num_values;
+				result += STENCIL[j] * input[index];
+			}
+			output[i] = result;
+		}
+
+		for (int i=EXTENT; i<num_values-EXTENT; i++) {
+			double result = 0;
+			for (int j=0; j<STENCIL_WIDTH; j++) {
+				int index = i - EXTENT + j;
+				result += STENCIL[j] * input[index];
+			}
+			output[i] = result;
+		}
+		
+		for (int i=num_values-EXTENT; i<num_values; i++) {
+			double result = 0;
+			for (int j=0; j<STENCIL_WIDTH; j++) {
+				int index = (i - EXTENT + j) % num_values;
+				result += STENCIL[j] * input[index];
+			}
+			output[i] = result;
+		}
+		// Swap input and output
+		if(rank == root){
+
+		}
+		if (s < num_steps-1) {
+			double *tmp = input;
+			input = output;
+			output = tmp;
+		}
+	}
 
 	free(input);
+	MPI_Request_free(&recv_obj[0]);
+	MPI_Request_free(&recv_obj[1]);
+	MPI_Request_free(&send_obj[0]);
+	MPI_Request_free(&send_obj[1]);
 	// Stop timer
 	double my_execution_time = MPI_Wtime() - start;
 
@@ -138,6 +180,7 @@ int main(int argc, char **argv) {
 
 	// Clean up
 	free(output);
+	free(process_memory);
 
 	MPI_Finalize(); 
 
