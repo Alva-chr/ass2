@@ -17,6 +17,7 @@ int main(int argc, char **argv) {
 	int rank, size;
 	MPI_Status status;
 
+	//Setting up MPI
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -24,15 +25,15 @@ int main(int argc, char **argv) {
 	double *input = NULL; //So that each process 
 	int num_values;
 
-	// Read input file
+	//Only the the process with rank 0 will read in the full input file
 	if(rank == root){
 		if (0 > (num_values = read_input(input_name, &input))) {
 			return 2;
 		}
 	}
 
+	//Broadcasting the N number of values to all the process
 	MPI_Bcast(&num_values, 1, MPI_INT, root, MPI_COMM_WORLD);
-
 
 	// Stencil values
 	double h = 2.0*PI/num_values;
@@ -45,6 +46,7 @@ int main(int argc, char **argv) {
 
 	double *output = NULL;
 
+	//Allocating data for the output file 
 	if(rank == root){
 		// Allocate data for result
 		if (NULL == (output = malloc(num_values * sizeof(double)))) {
@@ -53,32 +55,36 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	//Finding the number of elements per process and declaring pointers for storing the results
+	//of each stencil application for each process
 	int elements_per_process = num_values/size;
 	double *process_memory;
 	double *left_buffer;
 	double *data;
 	double *right_buffer;
 
+	//Allocating memory for each process
 	if (NULL == (process_memory = malloc((EXTENT + elements_per_process + EXTENT)* sizeof(double)))) {
 		perror("Couldn't allocate memory for output");
 		return 2;
 	}
 
+	//Setting the pointers to the correct part of the memory
 	left_buffer = process_memory;
 	data = process_memory+EXTENT;
 	right_buffer = process_memory+elements_per_process+EXTENT;
-
-
 	
+	//Scattering the input data from our root process to all the other process
 	MPI_Scatter(input, elements_per_process, MPI_DOUBLE, data, elements_per_process, MPI_DOUBLE, root, MPI_COMM_WORLD);
-
-	
 
 	//Setting up persistant communication
 	MPI_Request recv_obj[2];
 	MPI_Request send_obj[2];
+
 	int src; //source and destination are the same
 
+	//setting up the left buffer for persistant communication
+	//if it is the leftmost element the buffer will be filled with the 2 rightmost elements
 	if(rank-1 < 0){
 		src = size-1;
 	} else {
@@ -88,6 +94,9 @@ int main(int argc, char **argv) {
 	MPI_Recv_init(left_buffer,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &recv_obj[0]);
 	MPI_Send_init(left_buffer+EXTENT,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &send_obj[0]);
 
+
+	//setting up the right buffer for persistant communication
+	//if it is the rightmost element the buffer will be filled with the 2 leftmost elements
 	if(rank+1>size-1){
 		src = 0;
 	} else{
@@ -97,35 +106,22 @@ int main(int argc, char **argv) {
 	MPI_Recv_init(right_buffer,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &recv_obj[1]);
 	MPI_Send_init(right_buffer-EXTENT,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &send_obj[1]);
 
-
-	// MPI_Startall(2,recv_obj);
-	// MPI_Startall(2,send_obj);
-
-	// MPI_Waitall(2, recv_obj, &status);
-	// MPI_Waitall(2, send_obj, &status);
-
-	// if (rank==0){
-	// 	for(int i=0;i<elements_per_process+EXTENT*2;i++) {
-	// 		printf("Rank %d index %d = %lf\n",rank,i,process_memory[i]);
-	// 	}
-	// }
-
-	
+	//Where the process results will be saved
 	double *process_output = malloc(elements_per_process * sizeof(double)); //output for each process
 
 
 	// Repeatedly apply stencil
 	for (int s=0; s<num_steps; s++) {
 
+		//Starting all the send and recevie requests
 		MPI_Startall(2,recv_obj);
 		MPI_Startall(2,send_obj);
 
+		//Waits for all the requests to complete 
 		MPI_Waitall(2, recv_obj, MPI_STATUSES_IGNORE);
 		MPI_Waitall(2, send_obj, MPI_STATUSES_IGNORE);
 
-
-		// Apply stencil
-
+		//Applying the stencil
 		for (int i=0; i<elements_per_process; i++) {
 			double result = 0;
 			for (int j=0; j<STENCIL_WIDTH; j++) {
@@ -141,13 +137,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	//Gathering all the individual process results in the output file.
 	MPI_Gather(process_output, elements_per_process, MPI_DOUBLE, output, elements_per_process, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
-	free(input);
-	MPI_Request_free(&recv_obj[0]);
-	MPI_Request_free(&recv_obj[1]);
-	MPI_Request_free(&send_obj[0]);
-	MPI_Request_free(&send_obj[1]);
+
+
 	// Stop timer
 	double my_execution_time = MPI_Wtime() - start;
 
@@ -162,10 +156,16 @@ int main(int argc, char **argv) {
 	}
 
 
-	// Clean up
+	//Clean up memory
 	free(process_output);
 	free(output);
 	free(process_memory);
+	free(input);
+
+	MPI_Request_free(&recv_obj[0]);
+	MPI_Request_free(&recv_obj[1]);
+	MPI_Request_free(&send_obj[0]);
+	MPI_Request_free(&send_obj[1]);
 
 	MPI_Finalize(); 
 
