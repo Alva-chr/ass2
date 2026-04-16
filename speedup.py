@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 p = [1, 2, 4, 8]
 
 #speedup
-data_strong = [1, 1.87, 2.0297, 2.0633]
+data_strong = [1, 1.975, 1.7198, 1.4403]
 
-data_weak = [1, 0.9078, 0.9131, 0.2086]
+data_weak = [1, 0.78, 0.7380, 0.635]
 
 strong_ideal = p #ideal speedup for strong scaling
 
