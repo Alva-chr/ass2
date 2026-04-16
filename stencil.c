@@ -41,6 +41,8 @@ int main(int argc, char **argv) {
 	const int EXTENT = STENCIL_WIDTH/2;
 	const double STENCIL[] = {1.0/(12*h), -8.0/(12*h), 0.0, 8.0/(12*h), -1.0/(12*h)};
 
+	MPI_Barrier(MPI_COMM_WORLD);
+
 	// Start timer
 	double start = MPI_Wtime();
 
