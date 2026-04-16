@@ -5,11 +5,13 @@ import matplotlib.pyplot as plt
 p = [1, 2, 4, 8]
 
 #speedup
-data_strong = []
+data_strong = [1, 1.87, 2.0297, 2.0633]
 
-data_weak = []
+data_weak = [1, 0.9078, 0.9131, 0.2086]
 
-ideal = p #ideal speedup
+strong_ideal = p #ideal speedup for strong scaling
+
+weak_ideal = [1, 1, 1, 1] #ideal speedup for weak scaling
 
 plt.figure(figsize=(10, 6))
 
@@ -17,10 +19,13 @@ plt.figure(figsize=(10, 6))
 plt.plot(p, data_strong, marker='o', label='Strong scalability')
 
 # Plot speedup weak
-plt.plot(p, data_weak, marker='o', label='Weak scalability')
+#plt.plot(p, data_weak, marker='o', label='Weak scalability')
 
-# Plot ideal speedup
-plt.plot(p, ideal, 'k--', label='Ideal Speedup')
+# Plot ideal speedup strong
+plt.plot(p, strong_ideal, 'k--', label='Ideal Speedup')
+
+# Plot ideal speedup weak
+#plt.plot(p, weak_ideal, 'k--', label='Ideal Speedup')
 
 plt.xlabel('Number of Processes (p)')
 plt.ylabel('Speedup')
@@ -29,7 +34,7 @@ plt.ylabel('Speedup')
 plt.title('Speedup for n = 8000000  vs ideal speedup')
 
 #Title weak
-plt.title('Speedup for varying n vs ideal speedup')
+#plt.title('Speedup for varying n vs ideal speedup')
 
 plt.xticks(p)
 plt.grid(True, which="both", ls="--")
