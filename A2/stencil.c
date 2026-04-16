@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
 		src = rank -1;
 	}
 
-	MPI_Recv_init(left_buffer,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &recv_obj[0]);
+	MPI_Recv_init(left_buffer,EXTENT,MPI_DOUBLE,src, 111, MPI_COMM_WORLD, &recv_obj[0]);
 	MPI_Send_init(left_buffer+EXTENT,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &send_obj[0]);
 
 
@@ -106,11 +106,16 @@ int main(int argc, char **argv) {
 	}
 
 	MPI_Recv_init(right_buffer,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &recv_obj[1]);
-	MPI_Send_init(right_buffer-EXTENT,EXTENT,MPI_DOUBLE,src, 222, MPI_COMM_WORLD, &send_obj[1]);
+	MPI_Send_init(right_buffer-EXTENT,EXTENT,MPI_DOUBLE,src, 111, MPI_COMM_WORLD, &send_obj[1]);
 
 	//Where the process results will be saved
 	double *process_output = malloc(elements_per_process * sizeof(double)); //output for each process
 
+	// if (rank==0) {
+	// 	for (int i;i<EXTENT + elements_per_process + EXTENT;i++){
+
+	// 	}
+	// }
 
 	// Repeatedly apply stencil
 	for (int s=0; s<num_steps; s++) {
