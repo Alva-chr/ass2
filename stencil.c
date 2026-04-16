@@ -144,10 +144,17 @@ int main(int argc, char **argv) {
 
 	// Stop timer
 	double my_execution_time = MPI_Wtime() - start;
+	double max_execution_time = 0;
+
+
+	MPI_Reduce(&my_execution_time, &max_execution_time, 1, MPI_DOUBLE, MPI_MAX, root, MPI_COMM_WORLD);
 
 	// Write result
-	printf("%f\n", my_execution_time);
+
+
+	
 	if(rank == root){
+		printf("%f\n", max_execution_time);
 		#ifdef PRODUCE_OUTPUT_FILE
 		if (0 != write_output(output_name, output, num_values)) {
 			return 2;
